@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Usuarios</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Usuarios" });
+
+const app = document.getElementById("app");
+
+/* =========================
+   INIT
+========================= */
+init();
+
+/* =========================
+   INIT
+========================= */
+async function init(){
+  await render();
+}
+
+/* =========================
+   RENDER GENERAL
+========================= */
+async function render(){
+
+  const usuarios = await getUsuarios();
+
+  app.innerHTML = `
+    <div class="header-actions">
+      <h2>Usuarios</h2>
+      <button id="btnNuevo">+ Nuevo usuario</button>
+    </div>
+
+    <div class="card">
+      <div class="tabla">
+        ${usuarios.map(u => fila(u)).join("")}
+      </div>
+    </div>
+
+    <!-- MODAL -->
+    <div id="modal" class="modal hidden"></div>
+  `;
+
+  document.getElementById("btnNuevo")
+    .onclick = () => abrirModal();
+
+}
+
+/* =========================
+   GUARDAR
+========================= */
+async function guardarUsuario(){
+
+  const nombre = document.getElementById("nombre").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const rol = document.getElementById("rol").value;
+  const active = document.getElementById("active").checked;
+
+  if(!nombre || !email){
+    alert("Completa los campos");
+    return;
+  }
+
+  try {
+
+    if(usuarioEditando){
+
+      // ✅ UPDATE
+      await updateDoc(doc(db, "usuarios", usuarioEditando), {
+        nombre,
+        email,
+        rol,
+        active
+      });
+
+      usuarioEditando = null;
+
+    } else {
+
+      // ✅ CREATE
+      await addDoc(collection(db, "usuarios"), {
+        nombre,
+        email,
+        rol,
+        active
+      });
+
+    }
+
+    limpiarFormulario();
+    await render();
+
+  } catch(e){
+    console.error(e);
+    alert("Error");
+  }
+}
+
+/* =========================
+   LIMPIAR
+========================= */
+function limpiarFormulario(){
+  document.getElementById("nombre").value = "";
+  document.getElementById("email").value = "";
+  document.getElementById("rol").value = "jefe";
+  document.getElementById("active").checked = true;
+}
+
+/* =========================
+   FIRESTORE
+========================= */
+async function getUsuarios(){
+
+  const snapshot = await getDocs(collection(db, "usuarios"));
+
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+}
+
+/* =========================
+   TEMPLATE
+========================= */
+function fila(u){
+  return `
+    <div class="fila">
+
+      <div class="col">
+        <strong>${u.nombre}</strong>
+        <span>${u.email}</span>
+      </div>
+
+      <div class="col">
+        <span class="badge">${u.rol}</span>
+      </div>
+
+      <div class="col">
+        <span class="estado ${u.active ? "on" : "off"}">
+          ${u.active ? "Activo" : "Inactivo"}
+        </span>
+      </div>
+
+      <div class="col acciones">
+        <button onclick='abrirModal(${JSON.stringify(u)})'>✏️</button>
+        <button onclick="window.eliminar('${u.id}')">🗑️</button>
+      </div>
+
+    </div>
+  `;
+}
+
+let usuarioEditando = null;
+
+window.editar = async (id) => {
+
+  const usuarios = await getUsuarios();
+
+  const user = usuarios.find(u => u.id === id);
+
+  if(!user) return;
+
+  usuarioEditando = id;
+
+  document.getElementById("nombre").value = user.nombre;
+  document.getElementById("email").value = user.email;
+  document.getElementById("rol").value = user.rol;
+  document.getElementById("active").checked = user.active;
+
+};
+
+window.eliminar = async (id) => {
+
+  const ok = confirm("¿Eliminar usuario?");
+
+  if(!ok) return;
+
+  try {
+    await deleteDoc(doc(db, "usuarios", id));
+    await render();
+  } catch(e){
+    console.error(e);
+    alert("Error al eliminar");
+  }
+};
+
+window.abrirModal = function(user = null){
+
+  const modal = document.getElementById("modal");
+
+  modal.classList.remove("hidden");
+
+  modal.innerHTML = `
+    <div class="modal-content">
+
+      <h3>${user ? "Editar" : "Nuevo"} usuario</h3>
+
+      <input id="m-nombre" placeholder="Nombre" value="${user?.nombre || ""}">
+      <input id="m-email" placeholder="Correo" value="${user?.email || ""}">
+
+      <select id="m-rol">
+        <option value="admin">Admin</option>
+        <option value="rh">RH</option>
+        <option value="jefe">Jefe</option>
+        <option value="guardia">Guardia</option>
+        <option value="colaborador">Colaborador</option>
+      </select>
+
+      <label class="checkbox">
+        <input type="checkbox" id="m-active" ${user?.active ? "checked" : ""}>
+        Usuario activo
+      </label>
+
+      <div class="form-actions">
+        <button onclick="guardarModal('${user?.id || ""}')">
+          Guardar
+        </button>
+
+        <button onclick="cerrarModal()">Cancelar</button>
+      </div>
+
+    </div>
+  `;
+
+  if(user){
+    document.getElementById("m-rol").value = user.rol;
+  }
+}
+window.cerrarModal = () => {
+  document.getElementById("modal").classList.add("hidden");
+};
+window.guardarModal = async (id) => {
+
+  const nombre = document.getElementById("m-nombre").value.trim();
+  const email = document.getElementById("m-email").value.trim();
+  const rol = document.getElementById("m-rol").value;
+  const active = document.getElementById("m-active").checked;
+
+  if(!nombre || !email){
+    alert("Completa los campos");
+    return;
+  }
+
+  try {
+
+    if(id){
+      await updateDoc(doc(db, "usuarios", id), {
+        nombre, email, rol, active
+      });
+    } else {
+      await addDoc(collection(db, "usuarios"), {
+        nombre, email, rol, active
+      });
+    }
+
+    cerrarModal();
+    await render();
+
+  } catch(e){
+    console.error(e);
+    alert("Error");
+  }
+};
+
+</script>
+
+</body>
+</html>

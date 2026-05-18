@@ -1,0 +1,608 @@
+/* =========================
+   RESET GLOBAL
+========================= */
+* {
+  box-sizing: border-box;
+}
+
+/* =========================
+   VARIABLES (THEME)
+========================= */
+:root {
+  --primary: #0f172a;
+  --primary-hover: #1e293b;
+
+  --bg: #f5f7fb;
+  --card: #ffffff;
+
+  --border: #e5e7eb;
+  --text: #111827;
+  --muted: #6b7280;
+
+  --radius: 14px;
+}
+
+/* =========================
+   BODY BASE
+========================= */
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, Arial;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* contenedor global */
+.app-container {
+  max-width: 1100px;
+  margin: auto;
+}
+
+
+/* =========================
+   CONTENIDO PRINCIPAL
+========================= */
+#app {
+  width: 100%;
+  max-width: 1100px;
+  padding: 20px;
+  margin-bottom: 80px;
+}
+
+/* =========================
+   TOPBAR
+========================= */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+
+  width: 100%;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 14px 20px;
+
+  background: var(--primary);
+  color: white;
+}
+
+.topbar .left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.topbar strong {
+  font-size: 15px;
+}
+
+.topbar span {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.topbar .right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.topbar button {
+  background: white;
+  color: var(--primary);
+
+  border: none;
+  border-radius: 8px;
+
+  padding: 6px 10px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+/* =========================
+   TITULOS
+========================= */
+h1, h2, h3 {
+  margin: 0;
+}
+
+h2 {
+  margin-bottom: 12px;
+}
+
+/* =========================
+   LOGIN
+========================= */
+.login-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  min-height: 100vh;
+
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+
+  background: var(--card);
+  padding: 30px;
+
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.login-header h1 {
+  font-size: 18px;
+  color: var(--primary);
+}
+
+.login-header p {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* =========================
+   FORMULARIOS
+========================= */
+input, select {
+  width: 100%;
+  padding: 10px;
+
+  margin-bottom: 10px;
+
+  border: 1px solid var(--border);
+  border-radius: 10px;
+
+  font-size: 14px;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* =========================
+   BOTONES
+========================= */
+button {
+  background: var(--primary);
+  color: white;
+
+  border: none;
+  border-radius: 10px;
+
+  padding: 10px;
+  font-weight: 600;
+
+  cursor: pointer;
+  transition: .2s;
+}
+
+button:hover {
+  background: var(--primary-hover);
+}
+
+/* =========================
+   TARJETAS
+========================= */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.card {
+  background: var(--card);
+  padding: 20px;
+
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+
+  box-shadow: 0 6px 18px rgba(0,0,0,.05);
+
+  transition: .2s;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 22px rgba(0,0,0,.08);
+}
+
+.card p {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+/* =========================
+   FORM CARD
+========================= */
+.card input,
+.card select {
+  margin-bottom: 10px;
+}
+
+/* =========================
+   MENÚ INFERIOR
+========================= */
+.bottom-menu {
+  position: fixed;
+  bottom: 0;
+
+  left: 0;
+  right: 0;
+
+  max-width: 1100px;
+  margin: auto;
+
+  background: #fff;
+  border-top: 1px solid var(--border);
+}
+
+#menu {
+  display: flex;
+  width: 100%;
+}
+
+.menu-item {
+  flex: 1;
+  border: none;
+  background: none;
+
+  padding: 10px;
+  font-size: 12px;
+
+  text-align: center;
+  color: var(--muted);
+
+  cursor: pointer;
+  transition: .2s;
+}
+
+/* 🔥 HOVER (IMPORTANTE) */
+.menu-item:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--primary);
+}
+
+/* 🔥 ACTIVO */
+.menu-item.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* iconos */
+.menu-item svg {
+  width: 20px;
+  display: block;
+  margin: auto;
+  margin-bottom: 4px;
+}
+
+.menu-item svg {
+  width: 20px;
+  display: block;
+  margin: auto;
+}
+
+.menu-item.active {
+  color: var(--primary);
+}
+
+/* =========================
+   HR
+========================= */
+hr {
+  margin: 20px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+.topbar {
+  width: 100%;
+}
+
+.bottom-menu {
+  width: 100%;
+}
+
+.card {
+  cursor: pointer;
+}
+/* =========================
+   TABLA USUARIOS
+========================= */
+.tabla {
+  margin-top: 15px;
+}
+
+/* fila */
+.fila {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+
+  align-items: center;
+}
+
+/* columnas */
+.col strong {
+  display: block;
+}
+
+.col span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* badge rol */
+.badge {
+  background: #e5e7eb;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+/* estado */
+.estado {
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.estado.on {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.estado.off {
+  background: #fee2e2;
+  color: #991b1b;
+}
+/* =========================
+   FORMULARIO GRID
+========================= */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* inputs ocupan fila completa */
+.full {
+  grid-column: span 2;
+}
+
+/* =========================
+   CHECKBOX BONITO
+========================= */
+.checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;  /* 🔥 clave */
+  gap: 10px;
+
+  width: 100%;
+}
+
+/* =========================
+   ACCIONES FORM
+========================= */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+.acciones {
+  display: flex;
+  justify-content: flex-end;  /* 🔥 clave */
+  gap: 6px;
+}
+
+.acciones button {
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+/* =========================
+   MODAL
+========================= */
+.modal {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(0,0,0,0.4);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+}
+
+.modal-body ul {
+  padding-left: 15px;
+}
+
+/* header */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* body */
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* footer */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* botón secundario */
+.btn-secondary {
+  background: #e5e7eb;
+  color: #111;
+}
+
+.btn-secondary:hover {
+  background: #d1d5db;
+}
+.calendario-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+}
+
+.resumen ul {
+  padding-left: 15px;
+  margin: 10px 0;
+}
+
+.resumen li {
+  font-size: 14px;
+}
+.estado {
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.estado.pendiente {
+  background: #fef3c7;
+}
+
+.estado.aprobado {
+  background: #dcfce7;
+}
+
+.estado.rechazado {
+  background: #fee2e2;
+}
+.cards .card p {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+fila:first-child {
+  background: #f9fafb;
+  font-size: 13px;
+}
+.rojo {
+  color: #dc2626;
+}
+
+.naranja {
+  color: #d97706;
+}
+
+.verde {
+  color: #16a34a;
+}
+.estado {
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+/* estados */
+.estado.pendiente_jefe {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.estado.pendiente_rh {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.estado.aprobado {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.estado.rechazado {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.filtros {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.filtro {
+  background: #e5e7eb;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.filtro:hover {
+  background: #d1d5db;
+}
+
+.filtro.active {
+  background: #2563eb;
+  color: white;
+}
+.filtros select {
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+.grid-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}

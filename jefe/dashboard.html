@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Jefe</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { appUrl } from "../js/paths.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+import { getSession } from "../js/auth.js";
+
+import { collection, getDocs }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["jefe","admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Dashboard Jefe" });
+
+const app = document.getElementById("app");
+const user = getSession();
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+
+  const snap = await getDocs(collection(db, "solicitudes"));
+
+  const solicitudes = snap.docs.map(d => d.data());
+
+  // ✅ SOLO SU EQUIPO
+  const mias = solicitudes.filter(s => s.jefeId === user.id);
+
+  const pendientes = mias.filter(s => s.estado === "pendiente_jefe").length;
+
+  const creadas = mias.length;
+
+  const vac = mias.filter(s => s.tipo === "vacaciones").length;
+  const perm = mias.filter(s => s.tipo === "permiso").length;
+  const vales = mias.filter(s => s.tipo === "vale").length;
+
+  render({
+    pendientes,
+    creadas,
+    vac,
+    perm,
+    vales
+  });
+}
+
+/* =========================
+   RENDER
+========================= */
+function render(data){
+
+  app.innerHTML = `
+    <section>
+
+      <h2>Bienvenido, ${user?.nombre || "Jefe"}</h2>
+
+      <!-- 🔥 MÉTRICAS -->
+      <div class="grid-metrics">
+
+        <div class="card">
+          <p>Pendientes de aprobación</p>
+          <h3>${data.pendientes}</h3>
+        </div>
+
+        <div class="card">
+          <p>Solicitudes creadas</p>
+          <h3>${data.creadas}</h3>
+        </div>
+
+        <div class="card">
+          <p>Total equipo</p>
+          <h3>${data.creadas}</h3>
+        </div>
+
+      </div>
+
+      <!-- 🔥 POR TIPO -->
+      <div class="grid-metrics">
+
+        <div class="card">
+          <p>Vacaciones</p>
+          <h3>${data.vac}</h3>
+        </div>
+
+        <div class="card">
+          <p>Permisos</p>
+          <h3>${data.perm}</h3>
+        </div>
+
+        <div class="card">
+          <p>Vales</p>
+          <h3>${data.vales}</h3>
+        </div>
+
+      </div>
+
+      <!-- 🔥 ACCIONES -->
+      <div class="cards">
+
+        <div class="card" onclick="goVacaciones()">
+          <h3>Vacaciones</h3>
+          <p>Solicitar días</p>
+        </div>
+
+        <div class="card" onclick="goPermisos()">
+          <h3>Permisos</h3>
+          <p>Retardos o faltas</p>
+        </div>
+
+        <div class="card" onclick="goVales()">
+          <h3>Vales</h3>
+          <p>Entrada / salida</p>
+        </div>
+
+        <div class="card" onclick="goSolicitudes()">
+          <h3>Aprobaciones</h3>
+          <p>Autorizar solicitudes</p>
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+/* =========================
+   NAVEGACIÓN
+========================= */
+window.goVacaciones = () => {
+  window.location.href = appUrl("jefe/vacaciones.html");
+};
+
+window.goPermisos = () => {
+  window.location.href = appUrl("jefe/permisos.html");
+};
+
+window.goVales = () => {
+  window.location.href = appUrl("jefe/vales.html");
+};
+
+window.goSolicitudes = () => {
+  window.location.href = appUrl("jefe/solicitudes.html");
+};
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Solicitudes</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+
+import { collection, getDocs, updateDoc, doc }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["rh", "admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Solicitudes" });
+let tipoFiltro = "todos";
+let estadoFiltro = "todos";
+let empleadoFiltro = "todos";
+
+const app = document.getElementById("app");
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+  await render();
+}
+
+/* =========================
+   LABEL ESTADO
+========================= */
+function labelEstado(estado){
+
+  if(estado === "pendiente_jefe") return "Pendiente jefe";
+  if(estado === "pendiente_rh") return "Pendiente RH";
+  if(estado === "aprobado") return "Aprobado";
+  if(estado === "rechazado") return "Rechazado";
+
+  return estado;
+}
+
+/* =========================
+   RENDER
+========================= */
+async function render(){
+
+const solicitudes = await getSolicitudes();
+
+  // ✅ HISTORIAL COMPLETO
+ 
+let lista = solicitudes;
+
+// 🔹 filtro por tipo
+if(tipoFiltro !== "todos"){
+  lista = lista.filter(s => s.tipo === tipoFiltro);
+}
+
+// 🔹 filtro por estado
+if(estadoFiltro !== "todos"){
+  lista = lista.filter(s => s.estado === estadoFiltro);
+}
+
+// 🔹 filtro por empleado
+if(empleadoFiltro !== "todos"){
+  lista = lista.filter(s => s.empleadoNombre === empleadoFiltro);
+}
+
+// 🔹 ordenar
+lista = lista.sort((a, b) =>
+  new Date(b.fechaCreacion) - new Date(a.fechaCreacion)
+);
+  
+// 🔥 CONTADORES
+const contadores = {
+  todos: solicitudes.length,
+  pendiente_jefe: solicitudes.filter(s => s.estado === "pendiente_jefe").length,
+  pendiente_rh: solicitudes.filter(s => s.estado === "pendiente_rh").length,
+  aprobado: solicitudes.filter(s => s.estado === "aprobado").length,
+  rechazado: solicitudes.filter(s => s.estado === "rechazado").length
+};
+
+app.innerHTML = `
+  <h2>Solicitudes RH</h2>
+ <select id="filtroTipo" onchange="filtrarTipo()">
+  <option value="todos" ${tipoFiltro === "todos" ? "selected" : ""}>
+    Todos
+  </option>
+  <option value="vacaciones" ${tipoFiltro === "vacaciones" ? "selected" : ""}>
+    Vacaciones
+  </option>
+  <option value="permiso" ${tipoFiltro === "permiso" ? "selected" : ""}>
+    Permisos
+  </option>
+  <option value="vale" ${tipoFiltro === "vale" ? "selected" : ""}>
+    Vales
+  </option>
+</select>
+
+  <div class="filtros">
+    <select id="filtroEmpleado" onchange="filtrarEmpleado()">
+      <option value="todos">Todos los empleados</option>
+      ${listaEmpleadosUnicos(solicitudes).map(n => `
+        <option value="${n}" ${empleadoFiltro === n ? "selected" : ""}>
+          ${n}
+        </option>
+      `).join("")}
+    </select>
+
+    ${btnFiltro("todos", "Todos", contadores.todos)}
+    ${btnFiltro("pendiente_jefe", "Pend. jefe", contadores.pendiente_jefe)}
+    ${btnFiltro("pendiente_rh", "Pend. RH", contadores.pendiente_rh)}
+    ${btnFiltro("aprobado", "Aprobados", contadores.aprobado)}
+    ${btnFiltro("rechazado", "Rechazados", contadores.rechazado)}
+  </div>
+
+  <div class="card">
+    <div class="tabla">
+
+      <div class="fila">
+        <div class="col"><strong>Empleado</strong></div>
+        <div class="col"><strong>Tipo</strong></div>
+        <div class="col"><strong>Detalle</strong></div>
+        <div class="col"><strong>Total</strong></div>
+        <div class="col"><strong>Estado</strong></div>
+        <div class="col"><strong>Acciones</strong></div>
+      </div>
+
+      ${lista.map(s => fila(s)).join("")}
+
+    </div>
+  </div>
+
+  <!-- ✅ MODAL CORRECTO -->
+  <div id="modal" class="modal hidden"></div>
+`;
+}
+
+function formatFecha(fecha){
+
+  const d = new Date(fecha);
+
+  return d.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short"
+  });
+}
+
+function btnFiltro(valor, label, count){
+
+  const active = estadoFiltro === valor ? "active" : "";
+
+  return `
+    <button class="filtro ${active}" onclick="filtrar('${valor}')">
+      ${label} (${count})
+    </button>
+  `;
+}
+
+
+window.filtrar = function(valor){
+  estadoFiltro = valor;
+  render();
+};
+
+window.filtrarEmpleado = function(){
+
+  const select = document.getElementById("filtroEmpleado");
+  empleadoFiltro = select.value;
+
+  render();
+};
+
+window.filtrarTipo = function(){
+
+  const select = document.getElementById("filtroTipo");
+  tipoFiltro = select.value;
+
+  render();
+};
+
+function listaEmpleadosUnicos(solicitudes){
+
+  const nombres = solicitudes.map(s => s.empleadoNombre);
+
+  return [...new Set(nombres)].sort();
+}
+
+/* =========================
+   FIRESTORE
+========================= */
+async function getSolicitudes(){
+
+  const snap = await getDocs(collection(db, "solicitudes"));
+
+  return snap.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+}
+
+/* =========================
+   FILA
+========================= */
+function fila(s){
+
+  return `
+    <div class="fila">
+
+      <div class="col">
+        ${s.empleadoNombre}
+      </div>
+
+      <div class="col">
+        ${labelTipo(s)}
+      </div>
+
+      <div class="col">
+        ${detalleSolicitud(s)}
+      </div>
+
+      <div class="col">
+        ${s.totalDias || "-"}
+      </div>
+
+      <div class="col">
+        <span class="estado ${s.estado}">
+          ${labelEstado(s.estado)}
+        </span>
+      </div>
+
+      <div class="col acciones">
+        <button onclick="verSolicitud('${s.id}')">👁️</button>
+        ${acciones(s)}
+      </div>
+
+    </div>
+  `;
+}
+
+function labelTipo(s){
+
+  if(s.tipo === "vacaciones"){
+    return "Vacaciones";
+  }
+
+  if(s.tipo === "permiso"){
+    return s.tipoPermiso === "retardo"
+      ? "Retardo"
+      : "Falta";
+  }
+
+  if(s.tipo === "vale"){
+    return s.tipoVale === "salida"
+      ? "Salida"
+      : "Entrada";
+  }
+
+  return s.tipo;
+}
+
+function detalleSolicitud(s){
+
+  if(s.tipo === "vacaciones"){
+    return formatDias(s.dias);
+  }
+
+  if(s.tipo === "permiso"){
+    return `
+      ${formatFecha(s.fecha)} <br>
+      <small>${labelJustificacion(s.justificacion)}</small>
+    `;
+  }
+
+  if(s.tipo === "vale"){
+    return `
+      ${formatFecha(s.fecha)} <br>
+      <small>${labelTiempoVale(s.tiempo)}</small>
+    `;
+  }
+
+  return "-";
+}
+
+function labelJustificacion(j){
+
+  if(j === "con_goce") return "Con goce";
+  if(j === "sin_goce") return "Sin goce";
+
+  return j;
+}
+
+function labelTiempoVale(t){
+
+  if(t === "15min") return "Salida 15 min";
+  if(t === "30min") return "Salida 30 min";
+  if(t === "1hr") return "Salida 1 hora";
+  if(t === "sin_regreso") return "Salida sin regreso";
+  if(t === "entrada_815") return "Entrada posterior 8:15";
+
+  return t;
+}
+/* =========================
+   FORMATO DÍAS
+========================= */
+function formatDias(dias = []){
+
+  return dias.map(d => {
+    const date = new Date(d);
+    return date.toLocaleDateString("es-MX", {
+      day: "2-digit",
+      month: "short"
+    });
+  }).join(", ");
+}
+
+/* =========================
+   ACCIONES
+========================= */
+function acciones(s){
+
+  // ✅ SOLO RH aprueba lo que YA aprobó el jefe
+  if(s.estado === "pendiente_rh"){
+    return `
+      <button onclick="aprobar('${s.id}')">✅</button>
+      <button onclick="rechazar('${s.id}')">❌</button>
+    `;
+  }
+
+  return "-";
+}
+
+/* =========================
+   APROBAR
+========================= */
+window.aprobar = async (id) => {
+
+  await updateDoc(doc(db, "solicitudes", id), {
+    estado: "aprobado"
+  });
+  cerrarModal();
+  render();
+};
+
+/* =========================
+   RECHAZAR
+========================= */
+window.rechazar = async (id) => {
+
+  await updateDoc(doc(db, "solicitudes", id), {
+    estado: "rechazado"
+  });
+
+  render();
+};
+window.verSolicitud = async (id) => {
+
+  const solicitudes = await getSolicitudes();
+
+  const s = solicitudes.find(x => x.id === id);
+
+  if(!s) return;
+
+  const modal = document.getElementById("modal");
+
+  modal.classList.remove("hidden");
+
+  modal.innerHTML = `
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h3>Detalle de solicitud</h3>
+        <button onclick="cerrarModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <p><strong>Empleado:</strong> ${s.empleadoNombre}</p>
+
+        <p><strong>Días:</strong></p>
+        <ul>
+         ${detalleModal(s)}
+        </ul>
+
+        <p><strong>Total:</strong> ${s.totalDias} días</p>
+
+        <p><strong>Estado:</strong> 
+          <span class="estado ${s.estado}">
+            ${labelEstado(s.estado)}
+          </span>
+        </p>
+
+      </div>
+
+      <div class="modal-footer">
+        ${accionesModal(s)}
+      </div>
+
+    </div>
+  `;
+};
+
+
+function accionesModal(s){
+
+  if(s.estado === "pendiente_rh"){
+    return `
+      <button onclick="aprobar('${s.id}')">✅ Aprobar</button>
+      <button onclick="rechazar('${s.id}')">❌ Rechazar</button>
+    `;
+  }
+
+  return `<span class="estado ${s.estado}">
+    ${labelEstado(s.estado)}
+  </span>`;
+}
+
+function detalleModal(s){
+
+  if(s.tipo === "vacaciones"){
+    return `
+      <p><strong>Días:</strong></p>
+      <ul>
+        ${s.dias.map(d => `<li>${formatFecha(d)}</li>`).join("")}
+      </ul>
+      <p><strong>Total:</strong> ${s.totalDias} días</p>
+    `;
+  }
+
+  if(s.tipo === "permiso"){
+    return `
+      <p><strong>Fecha:</strong> ${formatFecha(s.fecha)}</p>
+      <p><strong>Tipo:</strong> ${labelTipo(s)}</p>
+      <p><strong>Motivo:</strong> ${s.motivo || "-"}</p>
+      <p><strong>Justificación:</strong> ${labelJustificacion(s.justificacion)}</p>
+    `;
+  }
+
+  if(s.tipo === "vale"){
+  return `
+    <p><strong>Fecha:</strong> ${formatFecha(s.fecha)}</p>
+    <p><strong>Tipo:</strong> ${labelTipo(s)}</p>
+    <p><strong>Tiempo:</strong> ${labelTiempoVale(s.tiempo)}</p>
+    <p><strong>Motivo:</strong> ${s.motivo || "-"}</p>
+  `;
+ }
+
+  return "";
+}
+
+
+window.cerrarModal = () => {
+  document.getElementById("modal").classList.add("hidden");
+};
+
+</script>
+
+</body>
+</html>

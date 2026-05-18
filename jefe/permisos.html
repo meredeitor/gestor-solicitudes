@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Permisos</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { appUrl } from "../js/paths.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+import { getSession } from "../js/auth.js";
+
+import { collection, addDoc, getDocs }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["jefe","admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Permisos" });
+
+const app = document.getElementById("app");
+const session = getSession();
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+  const empleados = await getEmpleados();
+  render(empleados);
+}
+
+/* =========================
+   RENDER
+========================= */
+function render(empleados){
+
+  // ✅ solo empleados del jefe
+  const lista = empleados.filter(e => e.jefeId === session.id);
+
+  app.innerHTML = `
+    <h2>Solicitar Permiso</h2>
+
+    <div class="card">
+
+      <label>Empleado</label>
+      <select id="empleado">
+        ${lista.map(e => `
+          <option value="${e.id}">
+            ${e.nombre}
+          </option>
+        `).join("")}
+      </select>
+
+      <label>Tipo de permiso</label>
+      <select id="tipoPermiso">
+        <option value="retardo">Retardo</option>
+        <option value="falta">Falta</option>
+      </select>
+
+      <label>Fecha</label>
+      <input type="date" id="fecha">
+
+      <label>Motivo</label>
+      <textarea id="motivo" placeholder="Describe el motivo"></textarea>
+
+      <label>Justificación</label>
+      <select id="justificacion">
+        <option value="con_goce">Con goce de sueldo</option>
+        <option value="sin_goce">Sin goce de sueldo</option>
+      </select>
+
+      <button id="btnGuardar" class="btn-primary">
+        Guardar
+      </button>
+
+    </div>
+  `;
+
+  document.getElementById("btnGuardar").onclick = () => guardar(lista);
+}
+
+/* =========================
+   GUARDAR
+========================= */
+async function guardar(empleados){
+
+  const empleadoId = document.getElementById("empleado").value;
+  const tipoPermiso = document.getElementById("tipoPermiso").value;
+  const fecha = document.getElementById("fecha").value;
+  const motivo = document.getElementById("motivo").value.trim();
+  const justificacion = document.getElementById("justificacion").value;
+
+  if(!fecha || !motivo){
+    alert("Completa los campos");
+    return;
+  }
+
+  const empleado = empleados.find(e => e.id === empleadoId);
+
+  try {
+
+    await addDoc(collection(db, "solicitudes"), {
+
+      tipo: "permiso",
+
+      empleadoId,
+      empleadoNombre: empleado.nombre,
+
+      tipoPermiso,
+      fecha,
+      motivo,
+      justificacion,
+
+      estado: "pendiente_jefe",
+      jefeId: session.id,
+
+      fechaCreacion: new Date().toISOString()
+
+    });
+
+    alert("Permiso enviado ✅");
+
+    window.location.href = appUrl("jefe/dashboard.html");
+
+  } catch(e){
+    console.error(e);
+    alert("Error al guardar");
+  }
+}
+
+/* =========================
+   DATA
+========================= */
+async function getEmpleados(){
+
+  const snap = await getDocs(collection(db, "empleados"));
+
+  return snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+}
+
+</script>
+
+</body>
+</html>

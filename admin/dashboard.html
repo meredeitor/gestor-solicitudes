@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { appUrl } from "../js/paths.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+
+import { collection, getDocs }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   PROTECCIÓN
+========================= */
+protectRoute(["admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Panel de Control" });
+
+const app = document.getElementById("app");
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+
+  const usuariosSnap = await getDocs(collection(db, "usuarios"));
+  const empleadosSnap = await getDocs(collection(db, "empleados"));
+  const solicitudesSnap = await getDocs(collection(db, "solicitudes"));
+
+  const solicitudes = solicitudesSnap.docs.map(d => d.data());
+
+  const totalUsuarios = usuariosSnap.size;
+  const totalEmpleados = empleadosSnap.size;
+  const totalSolicitudes = solicitudes.length;
+
+  // 🔥 CONTADORES POR TIPO
+  const totalVacaciones = solicitudes.filter(s => s.tipo === "vacaciones").length;
+  const totalPermisos = solicitudes.filter(s => s.tipo === "permiso").length;
+  const totalVales = solicitudes.filter(s => s.tipo === "vale").length;
+
+  // 🔥 CONTADORES POR ESTADO
+  const aprobados = solicitudes.filter(s => s.estado === "aprobado").length;
+  const pendientes = solicitudes.filter(s => s.estado === "pendiente_rh" || s.estado === "pendiente_jefe").length;
+
+  render({
+    totalUsuarios,
+    totalEmpleados,
+    totalSolicitudes,
+    totalVacaciones,
+    totalPermisos,
+    totalVales,
+    aprobados,
+    pendientes
+  });
+}
+
+/* =========================
+   RENDER
+========================= */
+function render(data){
+
+  app.innerHTML = `
+    <section>
+
+      <h2>Panel de Control</h2>
+      <p>Vista general del sistema</p>
+
+      <div class="grid-metrics">
+
+  <!-- 🔥 MÉTRICAS GENERALES -->
+  <div class="card">
+    <p><strong>Usuarios:</strong> ${data.totalUsuarios}</p>
+    <p><strong>Empleados:</strong> ${data.totalEmpleados}</p>
+    <p><strong>Total solicitudes:</strong> ${data.totalSolicitudes}</p>
+  </div>
+
+  <!-- 🔥 MÉTRICAS DETALLADAS -->
+  <div class="card">
+    <p><strong>Vacaciones:</strong> ${data.totalVacaciones}</p>
+    <p><strong>Permisos:</strong> ${data.totalPermisos}</p>
+    <p><strong>Vales:</strong> ${data.totalVales}</p>
+  </div>
+
+  <!-- 🔥 ESTADO -->
+  <div class="card">
+    <p><strong>Pendientes:</strong> ${data.pendientes}</p>
+    <p><strong>Aprobadas:</strong> ${data.aprobados}</p>
+  </div>
+
+</div>
+
+      <!-- 🔥 NAVEGACIÓN -->
+      <div class="cards">
+
+        <div class="card" onclick="goUsers()">
+          <h3>Usuarios</h3>
+          <p>Administrar accesos y roles</p>
+        </div>
+
+        <div class="card" onclick="goEmpleados()">
+          <h3>Empleados</h3>
+          <p>Gestión de personal</p>
+        </div>
+
+        <div class="card" onclick="goSolicitudes()">
+          <h3>Solicitudes</h3>
+          <p>Vacaciones, permisos y vales</p>
+        </div>
+
+        <div class="card" onclick="goSistema()">
+          <h3>Sistema</h3>
+          <p>Configuración general</p>
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+/* =========================
+   NAVEGACIÓN
+========================= */
+window.goUsers = () => {
+  window.location.href = appUrl("admin/usuarios.html");
+};
+
+window.goEmpleados = () => {
+  window.location.href = appUrl("rh/empleados.html");
+};
+
+window.goSolicitudes = () => {
+  window.location.href = appUrl("rh/vacaciones.html");
+};
+
+window.goSistema = () => {
+  alert("Configuración futura");
+};
+
+</script>
+
+</body>
+</html>

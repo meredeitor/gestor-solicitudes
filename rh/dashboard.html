@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard RH</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { appUrl } from "../js/paths.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+
+import { collection, getDocs }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["rh","admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Dashboard RH" });
+
+const app = document.getElementById("app");
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+
+  const solicitudes = await getSolicitudes();
+
+  render(solicitudes);
+}
+
+/* =========================
+   FIRESTORE
+========================= */
+async function getSolicitudes(){
+
+  const snap = await getDocs(collection(db, "solicitudes"));
+
+  return snap.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+}
+
+/* =========================
+   RENDER
+========================= */
+function render(solicitudes){
+
+  // ✅ estados correctos
+  const pendientes = solicitudes.filter(s =>
+    s.estado === "pendiente_rh"
+  ).length;
+
+  const aprobadas = solicitudes.filter(s =>
+    s.estado === "aprobado"
+  ).length;
+
+  const rechazadas = solicitudes.filter(s =>
+    s.estado === "rechazado"
+  ).length;
+
+  // ✅ por tipo
+  const vac = solicitudes.filter(s => s.tipo === "vacaciones").length;
+  const perm = solicitudes.filter(s => s.tipo === "permiso").length;
+  const vales = solicitudes.filter(s => s.tipo === "vale").length;
+
+  app.innerHTML = `
+    <section>
+
+      <h2>Panel RH</h2>
+
+      <!-- ✅ RESUMEN PRINCIPAL -->
+      <div class="grid-metrics">
+
+        <div class="card">
+          <p><strong>Pendientes</strong></p>
+          <h3>${pendientes}</h3>
+        </div>
+
+        <div class="card">
+          <p><strong>Aprobadas</strong></p>
+          <h3>${aprobadas}</h3>
+        </div>
+
+        <div class="card">
+          <p><strong>Rechazadas</strong></p>
+          <h3>${rechazadas}</h3>
+        </div>
+
+      </div>
+
+      <!-- ✅ POR TIPO -->
+      <div class="grid-metrics">
+
+        <div class="card">
+          <p>Vacaciones</p>
+          <h3>${vac}</h3>
+        </div>
+
+        <div class="card">
+          <p>Permisos</p>
+          <h3>${perm}</h3>
+        </div>
+
+        <div class="card">
+          <p>Vales</p>
+          <h3>${vales}</h3>
+        </div>
+
+      </div>
+
+      <!-- ✅ ACCESO -->
+      <div class="cards">
+
+        <div class="card" onclick="goSolicitudes()">
+          <h3>Solicitudes</h3>
+          <p>Administrar todas</p>
+        </div>
+
+        <div class="card" onclick="goEmpleados()">
+          <h3>Empleados</h3>
+          <p>Gestión de personal</p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ✅ RECIENTES -->
+    <section class="card">
+
+      <h3>Solicitudes recientes</h3>
+
+      <div class="tabla">
+
+        ${solicitudes
+          .sort((a,b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion))
+          .slice(0,5)
+          .map(s => `
+            <div class="fila">
+
+              <div class="col">
+                <strong>${s.empleadoNombre}</strong>
+                <span>${labelTipo(s)}</span>
+              </div>
+
+              <div class="col">
+                ${detalle(s)}
+              </div>
+
+              <div class="col">
+                <span class="estado ${s.estado}">
+                  ${labelEstado(s.estado)}
+                </span>
+              </div>
+
+            </div>
+          `).join("")}
+
+      </div>
+
+    </section>
+  `;
+}
+
+/* =========================
+   UTILIDADES
+========================= */
+
+function labelEstado(e){
+
+  if(e === "pendiente_jefe") return "Pend. jefe";
+  if(e === "pendiente_rh") return "Pend. RH";
+  if(e === "aprobado") return "Aprobado";
+  if(e === "rechazado") return "Rechazado";
+
+  return e;
+}
+
+function labelTipo(s){
+
+  if(s.tipo === "vacaciones") return "Vacaciones";
+
+  if(s.tipo === "permiso"){
+    return s.tipoPermiso === "retardo" ? "Retardo" : "Falta";
+  }
+
+  if(s.tipo === "vale"){
+    return s.tipoVale === "salida" ? "Salida" : "Entrada";
+  }
+
+  return s.tipo;
+}
+
+function detalle(s){
+
+  if(s.tipo === "vacaciones"){
+    return `${s.totalDias} días`;
+  }
+
+  if(s.tipo === "permiso"){
+    return formatFecha(s.fecha);
+  }
+
+  if(s.tipo === "vale"){
+    return formatFecha(s.fecha);
+  }
+
+  return "-";
+}
+
+function formatFecha(fecha){
+
+  const d = new Date(fecha);
+
+  return d.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short"
+  });
+}
+
+/* =========================
+   NAV
+========================= */
+
+window.goSolicitudes = () => {
+  window.location.href = appUrl("rh/vacaciones.html");
+};
+
+window.goEmpleados = () => {
+  window.location.href = appUrl("rh/empleados.html");
+};
+
+</script>
+
+</body>
+</html>

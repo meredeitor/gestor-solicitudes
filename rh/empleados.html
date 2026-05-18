@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Empleados</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+import { calcularSaldo } from "../js/utils.js";
+
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["rh", "admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Empleados" });
+
+const app = document.getElementById("app");
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+  render();
+}
+
+/* =========================
+   RENDER
+========================= */
+async function render(){
+
+  const empleados = await getEmpleados();
+  const solicitudes = await getSolicitudes();
+
+  app.innerHTML = `
+    <div class="header-actions">
+      <h2>Empleados</h2>
+      
+<div style="display:flex; gap:8px;">
+    <button class="btn-primary" onclick="abrirModal()">
+      + Agregar
+    </button>
+
+    <button onclick="importarExcel()" class="btn-secondary">
+      📥 Importar
+    </button>
+  </div>
+
+    <input type="file" id="fileExcel" accept=".xlsx,.xls" style="display:none;">
+    </div>
+
+    <div class="card">
+
+      <div class="tabla">
+
+        <!-- ENCABEZADO -->
+        <div class="fila">
+          <div class="col"><strong>Empleado</strong></div>
+          <div class="col"><strong>Ingreso</strong></div>
+          <div class="col"><strong>Días</strong></div>
+          <div class="col"><strong>Usados</strong></div>
+          <div class="col"><strong>Restantes</strong></div>
+          <div class="col"><strong>Acciones</strong></div>
+        </div>
+
+        ${empleados.map(e => fila(e, solicitudes)).join("")}
+
+      </div>
+
+    </div>
+
+    <!-- ✅ MODAL -->
+    <div id="modal" class="modal hidden"></div>
+  `;
+}
+
+/* =========================
+   FILA
+========================= */
+function fila(e, solicitudes){
+
+  const saldo = calcularSaldo(e, solicitudes);
+
+  return `
+    <div class="fila">
+
+      <div class="col">
+        <strong>${e.nombre}</strong>
+        <span>${e.area || ""}</span>
+      </div>
+
+      <div class="col">
+        ${e.fechaIngreso}
+      </div>
+
+      <div class="col">
+        ${saldo.disponibles}
+      </div>
+
+      <div class="col">
+        ${saldo.usados}
+      </div>
+
+      <div class="col">
+        <strong class="${getColorSaldo(saldo.restantes)}">
+          ${saldo.restantes}
+        </strong>
+      </div>
+
+      <div class="col acciones">
+        <button onclick="abrirModal('${e.id}')">✏️</button>
+        <button onclick="eliminarEmpleado('${e.id}')">🗑️</button>
+      </div>
+
+    </div>
+  `;
+}
+
+/* =========================
+   COLOR SALDO
+========================= */
+function getColorSaldo(restantes){
+  if(restantes <= 0) return "rojo";
+  if(restantes <= 5) return "naranja";
+  return "verde";
+}
+
+/* =========================
+   MODAL
+========================= */
+window.abrirModal = async function(id = null){
+
+  const jefes = await getJefes();
+  const empleados = await getEmpleados();
+
+  let emp = empleados.find(e => e.id === id);
+
+  const modal = document.getElementById("modal");
+  modal.classList.remove("hidden");
+
+  modal.innerHTML = `
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h3>${id ? "Editar" : "Nuevo"} empleado</h3>
+        <button onclick="cerrarModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <input id="m-nombre" placeholder="Nombre" value="${emp?.nombre || ""}">
+        <input id="m-area" placeholder="Área" value="${emp?.area || ""}">
+        <input id="m-fecha" type="date" value="${emp?.fechaIngreso || ""}">
+
+        <select id="m-jefe">
+          ${jefes.map(j => `
+            <option value="${j.id}" ${emp?.jefeId === j.id ? "selected" : ""}>
+              ${j.nombre}
+            </option>
+          `).join("")}
+        </select>
+
+      </div>
+
+      <div class="modal-footer">
+        <button onclick="cerrarModal()">Cancelar</button>
+        <button onclick="guardarEmpleado('${id || ""}')">Guardar</button>
+      </div>
+
+    </div>
+  `;
+};
+
+window.cerrarModal = () => {
+  document.getElementById("modal").classList.add("hidden");
+};
+
+/* =========================
+   GUARDAR
+========================= */
+window.guardarEmpleado = async (id) => {
+
+  const nombre = document.getElementById("m-nombre").value.trim();
+  const area = document.getElementById("m-area").value.trim();
+  const fechaIngreso = document.getElementById("m-fecha").value;
+  const jefeId = document.getElementById("m-jefe").value;
+
+  if(!nombre || !fechaIngreso){
+    alert("Completa los campos");
+    return;
+  }
+
+  const jefes = await getJefes();
+  const jefe = jefes.find(j => j.id === jefeId);
+
+  try {
+
+    if(id){
+      await updateDoc(doc(db, "empleados", id), {
+        nombre,
+        area,
+        fechaIngreso,
+        jefeId,
+        jefeNombre: jefe?.nombre || ""
+      });
+    } else {
+      await addDoc(collection(db, "empleados"), {
+        nombre,
+        area,
+        fechaIngreso,
+        jefeId,
+        jefeNombre: jefe?.nombre || ""
+      });
+    }
+
+    cerrarModal();
+    render();
+
+  } catch(e){
+    console.error(e);
+    alert("Error al guardar");
+  }
+};
+
+/* =========================
+   ELIMINAR
+========================= */
+window.eliminarEmpleado = async (id) => {
+
+  if(!confirm("¿Eliminar empleado?")) return;
+
+  try {
+    await deleteDoc(doc(db, "empleados", id));
+    render();
+  } catch(e){
+    console.error(e);
+    alert("Error al eliminar");
+  }
+};
+
+/* =========================
+   DATA
+========================= */
+async function getEmpleados(){
+  const snap = await getDocs(collection(db, "empleados"));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function getSolicitudes(){
+  const snap = await getDocs(collection(db, "solicitudes"));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function getJefes(){
+  const snap = await getDocs(collection(db, "usuarios"));
+
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(u => u.rol === "jefe");
+}
+window.importarExcel = () => {
+  document.getElementById("fileExcel").click();
+};
+
+document.getElementById("fileExcel").addEventListener("change", leerExcel);
+
+/* =========================
+   LEER EXCEL REAL (.xlsx)
+========================= */
+
+async function leerExcel(e){
+
+  const file = e.target.files[0];
+
+  if(!file){
+    alert("Selecciona un archivo");
+    return;
+  }
+
+  const data = await file.arrayBuffer();
+
+  const workbook = XLSX.read(data);
+
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  const rows = XLSX.utils.sheet_to_json(sheet);
+
+  const jefes = await getJefes();
+
+  let contador = 0;
+
+  for(const row of rows){
+
+    const nombre = row.nombre || row.Nombre;
+    const fechaIngreso = row.fechaIngreso || row.FechaIngreso;
+    const saldo = row.saldoInicial || row.SaldoInicial;
+    const jefeNombreExcel = row.jefe || row.Jefe;
+
+    if(!nombre || !fechaIngreso) continue;
+
+    // ✅ buscar jefe por nombre
+    const jefe = jefes.find(j =>
+      j.nombre.trim().toLowerCase() ===
+      (jefeNombreExcel || "").trim().toLowerCase()
+    );
+
+    try {
+
+      await addDoc(collection(db, "empleados"), {
+
+        nombre: nombre.trim(),
+        fechaIngreso: formatFecha(fechaIngreso),
+
+        saldoInicial: Number(saldo) || 0,
+
+        jefeId: jefe?.id || null,
+        jefeNombre: jefe?.nombre || jefeNombreExcel || "",
+
+        area: ""
+
+      });
+
+      contador++;
+
+    } catch(e){
+      console.error("Error:", row, e);
+    }
+  }
+
+  alert(`✅ Se importaron ${contador} empleados`);
+
+  render();
+}
+
+function formatFecha(fecha){
+
+  if(typeof fecha === "number"){
+    const d = XLSX.SSF.parse_date_code(fecha);
+    return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
+  }
+
+  return fecha;
+}
+
+
+
+
+</script>
+
+</body>
+</html>

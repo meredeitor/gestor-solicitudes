@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Colaborador</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { appUrl } from "../js/paths.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+import { getSession } from "../js/auth.js";
+
+import { collection, getDocs }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["colaborador","admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Mi panel" });
+
+const app = document.getElementById("app");
+const user = getSession();
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+
+  const snap = await getDocs(collection(db, "solicitudes"));
+
+  const solicitudes = snap.docs.map(d => d.data());
+
+  // ✅ SOLO SU INFORMACIÓN
+  const mias = solicitudes.filter(s =>
+    s.empleadoId === user.id
+  );
+
+  const pendientes = mias.filter(s =>
+    s.estado === "pendiente_jefe" || s.estado === "pendiente_rh"
+  ).length;
+
+  const aprobadas = mias.filter(s =>
+    s.estado === "aprobado"
+  ).length;
+
+  const rechazadas = mias.filter(s =>
+    s.estado === "rechazado"
+  ).length;
+
+  render({
+    pendientes,
+    aprobadas,
+    rechazadas
+  });
+}
+
+/* =========================
+   RENDER
+========================= */
+function render(data){
+
+  app.innerHTML = `
+    <section>
+
+      <h2>Bienvenido</h2>
+
+      <div class="grid-metrics">
+
+        <div class="card">
+          <p>Pendientes</p>
+          <h3>${data.pendientes}</h3>
+        </div>
+
+        <div class="card">
+          <p>Aprobadas</p>
+          <h3>${data.aprobadas}</h3>
+        </div>
+
+        <div class="card">
+          <p>Rechazadas</p>
+          <h3>${data.rechazadas}</h3>
+        </div>
+
+      </div>
+
+      <div class="cards">
+
+        <div class="card" onclick="goSolicitudes()">
+          <h3>Mis solicitudes</h3>
+          <p>Ver historial</p>
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+/* =========================
+   NAV
+========================= */
+window.goSolicitudes = () => {
+  window.location.href = appUrl("colaborador/solicitudes.html");
+};
+
+</script>
+
+</body>
+</html>

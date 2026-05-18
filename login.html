@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Acceso</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      width: 320px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 5px;
+    }
+
+    p {
+      margin-top: 0;
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    input:focus {
+      border-color: #2563eb;
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .link {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #2563eb;
+      cursor: pointer;
+    }
+
+    .error {
+      color: red;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <h2 id="title">Iniciar sesión</h2>
+  <p id="subtitle">Acceso al sistema</p>
+
+  <!-- 🔐 LOGIN -->
+  <div id="loginForm">
+
+    <input type="email" id="correo" placeholder="Correo">
+    <input type="password" id="password" placeholder="Contraseña">
+
+    <button onclick="login()">Entrar</button>
+
+    <div class="link" onclick="toggleForm()">
+      ¿No tienes cuenta? Crear usuario
+    </div>
+
+  </div>
+
+  <!-- 🆕 REGISTRO -->
+  <div id="registerForm" style="display:none;">
+
+    <input type="text" id="nombre" placeholder="Nombre completo">
+    <input type="email" id="r-correo" placeholder="Correo">
+    <input type="password" id="r-password" placeholder="Contraseña">
+
+    <select id="rol">
+      <option value="colaborador">Colaborador</option>
+    </select>
+
+    <button onclick="register()">Crear cuenta</button>
+
+    <div class="link" onclick="toggleForm()">
+      Ya tengo cuenta
+    </div>
+
+  </div>
+
+  <div id="error" class="error"></div>
+
+</div>
+
+<script type="module">
+
+import { db } from "./js/firebase.js";
+import { appUrl } from "./js/paths.js";
+import { collection, getDocs, addDoc }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   CAMBIAR FORMULARIO
+========================= */
+window.toggleForm = () => {
+
+  const login = document.getElementById("loginForm");
+  const register = document.getElementById("registerForm");
+
+  if(login.style.display !== "none"){
+    login.style.display = "none";
+    register.style.display = "block";
+
+    document.getElementById("title").textContent = "Crear cuenta";
+  } else {
+    login.style.display = "block";
+    register.style.display = "none";
+
+    document.getElementById("title").textContent = "Iniciar sesión";
+  }
+
+  document.getElementById("error").textContent = "";
+};
+
+/* =========================
+   LOGIN
+========================= */
+window.login = async () => {
+
+  const correo = document.getElementById("correo").value.trim();
+  const password = document.getElementById("password").value;
+  const error = document.getElementById("error");
+
+  error.textContent = "";
+
+  const snap = await getDocs(collection(db, "usuarios"));
+
+  const usuarios = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const user = usuarios.find(u =>
+    u.email?.toLowerCase() === correo.toLowerCase()
+  );
+
+  if(!user){
+    error.textContent = "Correo no encontrado";
+    return;
+  }
+
+  if(user.password !== password){
+    error.textContent = "Contraseña incorrecta";
+    return;
+  }
+
+  localStorage.setItem("session", JSON.stringify(user));
+
+  redirect(user.rol);
+};
+
+/* =========================
+   REGISTRO
+========================= */
+window.register = async () => {
+
+  const nombre = document.getElementById("nombre").value.trim();
+  const correo = document.getElementById("r-correo").value.trim().toLowerCase();
+  const password = document.getElementById("r-password").value;
+  const error = document.getElementById("error");
+
+  if(!nombre || !correo || !password){
+    error.textContent = "Completa los campos";
+    return;
+  }
+
+  // ✅ validar duplicados
+  const snap = await getDocs(collection(db, "usuarios"));
+  const usuarios = snap.docs.map(d => d.data());
+
+  const existe = usuarios.find(u => u.email === correo);
+
+  if(existe){
+    error.textContent = "El correo ya está registrado";
+    return;
+  }
+
+  try {
+
+    await addDoc(collection(db, "usuarios"), {
+      nombre,
+      email: correo,
+      password,
+      rol: "colaborador",
+      active: true
+    });
+
+    error.style.color = "green";
+    error.textContent = "Cuenta creada ✅";
+
+  } catch(e){
+    console.error(e);
+    error.textContent = "Error al registrar";
+  }
+};
+
+/* =========================
+   REDIRECT
+========================= */
+function redirect(rol){
+
+  if(rol === "admin") location.href = appUrl("admin/dashboard.html");
+  if(rol === "rh") location.href = appUrl("rh/dashboard.html");
+  if(rol === "jefe") location.href = appUrl("jefe/dashboard.html");
+  if(rol === "guardia") location.href = appUrl("guardia/dashboard.html");
+  if(rol === "colaborador") location.href = appUrl("colaborador/dashboard.html");
+}
+
+</script>
+
+</body>
+</html>

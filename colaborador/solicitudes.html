@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Mis solicitudes</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+import { getSession } from "../js/auth.js";
+
+import { collection, getDocs }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["colaborador","admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Mis solicitudes" });
+
+const app = document.getElementById("app");
+const user = getSession();
+
+let estadoFiltro = "todos";
+
+/* =========================
+   INIT
+========================= */
+init();
+
+async function init(){
+
+  const solicitudes = await getSolicitudes();
+
+  render(solicitudes);
+}
+
+/* =========================
+   DATA
+========================= */
+async function getSolicitudes(){
+
+  const snap = await getDocs(collection(db, "solicitudes"));
+
+  return snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+}
+
+/* =========================
+   RENDER
+========================= */
+function render(solicitudes){
+
+  // ✅ SOLO SU INFORMACIÓN
+  let lista = solicitudes.filter(s =>
+    s.empleadoId === user.id
+  );
+
+  // ✅ FILTRO ESTADO
+  if(estadoFiltro !== "todos"){
+    lista = lista.filter(s => s.estado === estadoFiltro);
+  }
+
+  // ✅ ORDEN
+  lista = lista.sort((a,b) =>
+    new Date(b.fechaCreacion) - new Date(a.fechaCreacion)
+  );
+
+  app.innerHTML = `
+    <h2>Mis solicitudes</h2>
+
+    <div class="filtros">
+      ${btnFiltro("todos", "Todos")}
+      ${btnFiltro("pendiente_jefe", "Pend. jefe")}
+      ${btnFiltro("pendiente_rh", "Pend. RH")}
+      ${btnFiltro("aprobado", "Aprobado")}
+      ${btnFiltro("rechazado", "Rechazado")}
+    </div>
+
+    <div class="card">
+
+      <div class="tabla">
+
+        <div class="fila">
+          <div class="col"><strong>Tipo</strong></div>
+          <div class="col"><strong>Detalle</strong></div>
+          <div class="col"><strong>Estado</strong></div>
+          <div class="col"><strong>Acción</strong></div>
+        </div>
+
+        ${lista.map(s => fila(s)).join("")}
+
+      </div>
+
+    </div>
+
+    <div id="modal" class="modal hidden"></div>
+  `;
+}
+
+/* =========================
+   FILA
+========================= */
+function fila(s){
+
+  return `
+    <div class="fila">
+
+      <div class="col">
+        ${labelTipo(s)}
+      </div>
+
+      <div class="col">
+        ${detalle(s)}
+      </div>
+
+      <div class="col">
+        <span class="estado ${s.estado}">
+          ${labelEstado(s.estado)}
+        </span>
+      </div>
+
+      <div class="col acciones">
+        <button onclick="verDetalle('${s.id}')">👁️</button>
+      </div>
+
+    </div>
+  `;
+}
+
+/* =========================
+   DETALLE TABLA
+========================= */
+function detalle(s){
+
+  if(s.tipo === "vacaciones"){
+    return `${s.totalDias} días`;
+  }
+
+  if(s.tipo === "permiso"){
+    return formatFecha(s.fecha);
+  }
+
+  if(s.tipo === "vale"){
+    return formatFecha(s.fecha);
+  }
+
+  return "-";
+}
+
+/* =========================
+   TIPO
+========================= */
+function labelTipo(s){
+
+  if(s.tipo === "vacaciones") return "Vacaciones";
+
+  if(s.tipo === "permiso"){
+    return s.tipoPermiso === "retardo" ? "Retardo" : "Falta";
+  }
+
+  if(s.tipo === "vale"){
+    return s.tipoVale === "salida" ? "Salida" : "Entrada";
+  }
+
+  return s.tipo;
+}
+
+/* =========================
+   ESTADO
+========================= */
+function labelEstado(e){
+
+  if(e === "pendiente_jefe") return "Pend. jefe";
+  if(e === "pendiente_rh") return "Pend. RH";
+  if(e === "aprobado") return "Aprobado";
+  if(e === "rechazado") return "Rechazado";
+
+  return e;
+}
+
+/* =========================
+   MODAL
+========================= */
+window.verDetalle = async (id) => {
+
+  const solicitudes = await getSolicitudes();
+  const s = solicitudes.find(x => x.id === id);
+
+  const modal = document.getElementById("modal");
+  modal.classList.remove("hidden");
+
+  modal.innerHTML = `
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h3>Detalle</h3>
+        <button onclick="cerrarModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        ${detalleModal(s)}
+      </div>
+
+    </div>
+  `;
+};
+
+function detalleModal(s){
+
+  if(s.tipo === "vacaciones"){
+    return `
+      <p><strong>Días:</strong></p>
+      <ul>
+        ${s.dias.map(d => `<li>${formatFecha(d)}</li>`).join("")}
+      </ul>
+      <p>Total: ${s.totalDias}</p>
+    `;
+  }
+
+  if(s.tipo === "permiso"){
+    return `
+      <p>Fecha: ${formatFecha(s.fecha)}</p>
+      <p>Motivo: ${s.motivo}</p>
+    `;
+  }
+
+  if(s.tipo === "vale"){
+    return `
+      <p>Fecha: ${formatFecha(s.fecha)}</p>
+      <p>Tiempo: ${s.tiempo}</p>
+      <p>Motivo: ${s.motivo}</p>
+    `;
+  }
+
+  return "";
+}
+
+window.cerrarModal = () => {
+  document.getElementById("modal").classList.add("hidden");
+};
+
+/* =========================
+   FILTROS
+========================= */
+function btnFiltro(valor, label){
+
+  const active = estadoFiltro === valor ? "active" : "";
+
+  return `
+    <button class="filtro ${active}" onclick="filtrar('${valor}')">
+      ${label}
+    </button>
+  `;
+}
+
+window.filtrar = function(valor){
+  estadoFiltro = valor;
+  init();
+};
+
+/* =========================
+   UTIL
+========================= */
+function formatFecha(fecha){
+
+  const d = new Date(fecha);
+
+  return d.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short"
+  });
+}
+
+</script>
+
+</body>
+</html>

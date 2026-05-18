@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Guardia</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+
+import { collection, getDocs, updateDoc, doc }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["guardia"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Validaciones" });
+
+const app = document.getElementById("app");
+
+init();
+
+/* =========================
+   INIT
+========================= */
+async function init(){
+  render();
+}
+
+/* =========================
+   UI
+========================= */
+async function render(){
+
+  const solicitudes = await getSolicitudes();
+
+  // ✅ SOLO APROBADAS
+ const lista = solicitudes.filter(s =>
+  s.estado === "aprobado" &&
+  s.tipo === "vale"
+);
+
+  app.innerHTML = `
+    <h2>Validación de salidas</h2>
+
+    <div class="card">
+      <div class="tabla">
+
+        <div class="fila">
+          <div class="col"><strong>Empleado</strong></div>
+          <div class="col"><strong>Tipo</strong></div>
+          <div class="col"><strong>Detalle</strong></div>
+          <div class="col"><strong>Acción</strong></div>
+        </div>
+
+        ${lista.map(s => fila(s)).join("")}
+
+      </div>
+    </div>
+  `;
+}
+
+/* =========================
+   FILA
+========================= */
+function fila(s){
+
+  return `
+    <div class="fila">
+
+      <div class="col">
+        ${s.empleadoNombre}
+      </div>
+
+      <div class="col">
+        ${labelTipo(s)}
+      </div>
+
+      <div class="col">
+        ${detalle(s)}
+      </div>
+
+      <div class="col acciones">
+        <button onclick="validar('${s.id}')">✅ Validar</button>
+      </div>
+
+    </div>
+  `;
+}
+
+/* =========================
+   DETALLE
+========================= */
+function detalle(s){
+
+  if(s.tipo === "vacaciones"){
+    return "Vacaciones";
+  }
+
+  if(s.tipo === "permiso"){
+    return `${formatFecha(s.fecha)}`;
+  }
+
+  if(s.tipo === "vale"){
+    return `${formatFecha(s.fecha)}`;
+  }
+
+  return "-";
+}
+
+/* =========================
+   TIPO
+========================= */
+function labelTipo(s){
+
+  if(s.tipo === "vacaciones") return "Vacaciones";
+
+  if(s.tipo === "permiso"){
+    return s.tipoPermiso === "retardo"
+      ? "Retardo"
+      : "Falta";
+  }
+
+  if(s.tipo === "vale"){
+    return s.tipoVale === "salida"
+      ? "Salida"
+      : "Entrada";
+  }
+
+  return s.tipo;
+}
+
+/* =========================
+   VALIDAR
+========================= */
+window.validar = async (id) => {
+
+  await updateDoc(doc(db, "solicitudes", id), {
+    validado: true,
+    fechaValidacion: new Date().toISOString()
+  });
+
+  render();
+};
+
+/* =========================
+   UTIL
+========================= */
+function formatFecha(fecha){
+
+  const d = new Date(fecha);
+
+  return d.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short"
+  });
+}
+
+/* =========================
+   DATA
+========================= */
+async function getSolicitudes(){
+
+  const snap = await getDocs(collection(db, "solicitudes"));
+
+  return snap.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+}
+
+</script>
+
+</body>
+</html>

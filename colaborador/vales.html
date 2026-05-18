@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Vales</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+
+<script type="module">
+
+import { initLayout } from "../js/layout.js";
+import { appUrl } from "../js/paths.js";
+import { protectRoute } from "../js/router.js";
+import { db } from "../js/firebase.js";
+import { getSession } from "../js/auth.js";
+
+import { collection, addDoc }
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+/* =========================
+   SEGURIDAD
+========================= */
+protectRoute(["colaborador","admin"]);
+
+/* =========================
+   LAYOUT
+========================= */
+initLayout({ title: "Vales" });
+
+const app = document.getElementById("app");
+const user = getSession();
+
+/* =========================
+   INIT
+========================= */
+init();
+
+function init(){
+  render();
+}
+
+/* =========================
+   UI
+========================= */
+function render(){
+
+  app.innerHTML = `
+    <h2>Solicitar Vale</h2>
+
+    <div class="card">
+
+      <h3>${user?.nombre || "Colaborador"}</h3>
+
+      <label>Tipo</label>
+      <select id="tipoVale" onchange="cambiarOpciones()">
+        <option value="salida">Salida</option>
+        <option value="entrada">Entrada</option>
+      </select>
+
+      <label>Tiempo autorizado</label>
+      <select id="tiempo"></select>
+
+      <label>Fecha</label>
+      <input type="date" id="fecha">
+
+      <label>Motivo</label>
+      <textarea id="motivo" placeholder="Describe el motivo"></textarea>
+
+      <button class="btn-primary" onclick="guardar()">
+        Enviar solicitud
+      </button>
+
+    </div>
+  `;
+
+  cambiarOpciones();
+}
+
+/* =========================
+   OPCIONES DINÁMICAS
+========================= */
+window.cambiarOpciones = function(){
+
+  const tipo = document.getElementById("tipoVale").value;
+  const select = document.getElementById("tiempo");
+
+  if(tipo === "salida"){
+    select.innerHTML = `
+      <option value="15min">Salida 15 min</option>
+      <option value="30min">Salida 30 min</option>
+      <option value="1hr">Salida 1 hora</option>
+      <option value="sin_regreso">Salida sin regreso</option>
+    `;
+  }
+
+  if(tipo === "entrada"){
+    select.innerHTML = `
+      <option value="entrada_815">
+        Entrada posterior a 8:15 am
+      </option>
+    `;
+  }
+};
+
+/* =========================
+   GUARDAR
+========================= */
+window.guardar = async () => {
+
+  const tipoVale = document.getElementById("tipoVale").value;
+  const tiempo = document.getElementById("tiempo").value;
+  const fecha = document.getElementById("fecha").value;
+  const motivo = document.getElementById("motivo").value.trim();
+
+  if(!fecha || !motivo){
+    alert("Completa todos los campos");
+    return;
+  }
+
+  try {
+
+    await addDoc(collection(db, "solicitudes"), {
+
+      tipo: "vale",
+
+      empleadoId: user.id,
+      empleadoNombre: user.nombre,
+
+      tipoVale,
+      tiempo,
+      fecha,
+      motivo,
+
+      estado: "pendiente_jefe",
+      jefeId: user.jefeId || null,
+
+      fechaCreacion: new Date().toISOString()
+
+    });
+
+    alert("Vale enviado ✅");
+
+    window.location.href = appUrl("colaborador/dashboard.html");
+
+  } catch(e){
+    console.error(e);
+    alert("Error al guardar");
+  }
+};
+
+</script>
+
+</body>
+</html>
