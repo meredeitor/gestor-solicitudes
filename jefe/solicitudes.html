@@ -231,12 +231,51 @@ function detalleModal(s){
 ========================= */
 window.aprobar = async (id) => {
 
-  await updateDoc(doc(db, "solicitudes", id), {
-    estado: "pendiente_rh"
-  });
+  try {
 
-  cerrarModal();
-  init();
+    // 🔍 obtener la solicitud
+    const snap = await getDocs(collection(db, "solicitudes"));
+    const solicitudes = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
+
+    const s = solicitudes.find(x => x.id === id);
+
+    if(!s){
+      alert("Solicitud no encontrada");
+      return;
+    }
+
+    /* =========================
+       NUEVA LÓGICA
+    ========================= */
+
+    // ✅ VALES → aprobado directo
+    if(s.tipo === "vale"){
+
+      await updateDoc(doc(db, "solicitudes", id), {
+        estado: "aprobado"
+      });
+
+    } 
+    // ✅ TODO LO DEMÁS → RH
+    else {
+
+      await updateDoc(doc(db, "solicitudes", id), {
+        estado: "pendiente_rh"
+      });
+
+    }
+
+    cerrarModal();
+    init();
+
+  } catch(e){
+    console.error(e);
+    alert("Error al aprobar");
+  }
+
 };
 
 window.rechazar = async (id) => {
