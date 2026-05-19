@@ -19,23 +19,13 @@ import { getSession } from "../js/auth.js";
 import { collection, getDocs, addDoc }
 from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
-import { calcularSaldo } from "../js/utils.js";
-
-/* =========================
-   SEGURIDAD
-========================= */
 protectRoute(["colaborador","admin"]);
-
-/* =========================
-   LAYOUT
-========================= */
 initLayout({ title: "Vacaciones" });
 
 const app = document.getElementById("app");
 const user = getSession();
 
 let dias = [];
-let solicitudesGlobal = [];
 let empleadoActual = null;
 
 /* =========================
@@ -45,11 +35,11 @@ init();
 
 async function init(){
 
-  const empleados = await loadEmpleados();
-  solicitudesGlobal = await getSolicitudes();
+  const empleados = await getEmpleados();
 
-  // ✅ SOLO EL MISMO USUARIO
-  empleadoActual = empleados.find(e => e.id === user.id);
+  empleadoActual = empleados.find(e =>
+    String(e.nomina).trim() === String(user.nomina).trim()
+  );
 
   render();
 }
@@ -62,190 +52,140 @@ function render(){
   app.innerHTML = `
     <div class="card">
 
-      <h3>${empleadoActual?.nombre || "Colaborador"}</h3>
+      <h3>${user.nombre}</h3>
 
-      <hr>
-
-      <input type="date" id="fechaInput">
-      <button id="btnAdd">+ Agregar fecha</button>
+      <input type="date" id="fecha">
+      <button id="btnAdd">+ Agregar</button>
 
       <ul id="lista"></ul>
 
-      <div class="totales">
-        Total: <strong id="total">0</strong> días
-      </div>
+      <p>Total: <strong id="total">0</strong> días</p>
 
-      <div id="saldoInfo" style="margin-top:10px;"></div>
-
-      <button id="btnEnviar" class="btn-primary">
+      <button id="btnGuardar" class="btn-primary">
         Enviar solicitud
       </button>
+
+      <div id="loader" style="display:none; margin-top:10px;">
+        ⏳ Enviando solicitud...
+      </div>
 
     </div>
   `;
 
-  document.getElementById("btnAdd").onclick = agregarFecha;
-  document.getElementById("btnEnviar").onclick = guardar;
+  document.getElementById("btnAdd")
+    .addEventListener("click", agregar);
 
-  renderSaldo();
+  document.getElementById("btnGuardar")
+    .addEventListener("click", guardar);
 }
 
 /* =========================
    AGREGAR FECHA
 ========================= */
-function agregarFecha(){
+function agregar(){
 
-  const input = document.getElementById("fechaInput");
-  const fecha = input.value;
+  const fecha = document.getElementById("fecha").value;
 
   if(!fecha){
-    alert("Selecciona una fecha");
+    alert("Selecciona fecha");
     return;
   }
 
   if(dias.includes(fecha)){
-    alert("Fecha ya agregada");
+    alert("Ya agregada");
     return;
   }
 
   dias.push(fecha);
-
   renderLista();
-  validarExceso();
 
-  input.value = "";
+  document.getElementById("fecha").value = "";
 }
 
 /* =========================
-   LISTA
+   RENDER LISTA
 ========================= */
 function renderLista(){
 
-  const ul = document.getElementById("lista");
-
-  ul.innerHTML = dias.map(d => `
-    <li>
-      ${d}
-      <button onclick="remover('${d}')">❌</button>
-    </li>
-  `).join("");
+  document.getElementById("lista").innerHTML =
+    dias.map(d => `<li>${d}</li>`).join("");
 
   document.getElementById("total").textContent = dias.length;
 }
 
 /* =========================
-   REMOVER
-========================= */
-window.remover = function(fecha){
-  dias = dias.filter(d => d !== fecha);
-  renderLista();
-  validarExceso();
-};
-
-/* =========================
-   SALDO
-========================= */
-function renderSaldo(){
-
-  if(!empleadoActual) return;
-
-  const saldo = calcularSaldo(empleadoActual, solicitudesGlobal);
-
-  document.getElementById("saldoInfo").innerHTML = `
-    <small>
-      Disponibles: ${saldo.disponibles} |
-      Usados: ${saldo.usados} |
-      Restantes: <strong>${saldo.restantes}</strong>
-    </small>
-  `;
-}
-
-/* =========================
-   VALIDAR EXCESO
-========================= */
-function validarExceso(){
-
-  if(!empleadoActual) return;
-
-  const saldo = calcularSaldo(empleadoActual, solicitudesGlobal);
-
-  if(dias.length > saldo.restantes){
-
-    document.getElementById("saldoInfo").innerHTML += `
-      <div style="color:red;">
-        ⚠️ Excede los días disponibles
-      </div>
-    `;
-  }
-}
-
-/* =========================
-   GUARDAR
+   GUARDAR (CON LOADER 🔥)
 ========================= */
 async function guardar(){
 
   if(dias.length === 0){
-    alert("Agrega al menos una fecha");
+    alert("Agrega fechas");
     return;
   }
 
-  const saldo = calcularSaldo(empleadoActual, solicitudesGlobal);
+  const btn = document.getElementById("btnGuardar");
+  const loader = document.getElementById("loader");
 
-  if(dias.length > saldo.restantes){
-    alert("No tienes suficientes días");
-    return;
-  }
+  // ✅ activar loader
+  loader.style.display = "block";
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
 
   try {
 
-    await addDoc(collection(db, "solicitudes"), {
+    await addDoc(collection(db,"solicitudes"),{
 
-      tipo: "vacaciones",
+      tipo:"vacaciones",
 
-      empleadoId: user.id,
-      empleadoNombre: user.nombre,
+      empleadoId:user.id,
+      empleadoNombre:user.nombre,
+      nomina:user.nomina,
 
       dias,
-      totalDias: dias.length,
+      totalDias:dias.length,
 
-      estado: "pendiente_jefe",
-      jefeId: user.jefeId || null,
+      estado:"pendiente_jefe",
 
-      fechaCreacion: new Date().toISOString()
+      jefeId: empleadoActual?.jefeId ?? null,
+
+      fechaCreacion:new Date().toISOString()
 
     });
 
-    alert("Solicitud enviada ✅");
+    // ✅ feedback inmediato
+    loader.textContent = "✅ Enviado correctamente";
 
+    // ✅ limpiar datos
     dias = [];
-    location.href = appUrl("colaborador/dashboard.html");
+    renderLista();
+
+    // ✅ redirigir elegante
+    setTimeout(() => {
+      window.location.href = appUrl("colaborador/dashboard.html");
+    }, 800);
 
   } catch(e){
+
     console.error(e);
-    alert("Error al guardar");
+
+    alert("Error al enviar");
+
+    loader.style.display = "none";
+    btn.disabled = false;
+    btn.textContent = "Enviar solicitud";
   }
 }
 
 /* =========================
    DATA
 ========================= */
-async function loadEmpleados(){
+async function getEmpleados(){
 
-  const snap = await getDocs(collection(db, "empleados"));
+  const snap = await getDocs(collection(db,"empleados"));
 
-  return snap.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
-}
-
-async function getSolicitudes(){
-
-  const snap = await getDocs(collection(db, "solicitudes"));
-
-  return snap.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
+  return snap.docs.map(d => ({
+    id:d.id,
+    ...d.data()
   }));
 }
 
