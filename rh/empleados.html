@@ -164,6 +164,7 @@ window.abrirModal = async function(id = null){
 
       <div class="modal-body">
 
+        <input id="m-nomina" placeholder="Nómina" value="${emp?.nomina || ""}">
         <input id="m-nombre" placeholder="Nombre" value="${emp?.nombre || ""}">
         <input id="m-area" placeholder="Área" value="${emp?.area || ""}">
         <input id="m-fecha" type="date" value="${emp?.fechaIngreso || ""}">
@@ -195,13 +196,14 @@ window.cerrarModal = () => {
    GUARDAR
 ========================= */
 window.guardarEmpleado = async (id) => {
-
+  
+  const nomina = document.getElementById("m-nomina").value.trim();
   const nombre = document.getElementById("m-nombre").value.trim();
   const area = document.getElementById("m-area").value.trim();
   const fechaIngreso = document.getElementById("m-fecha").value;
   const jefeId = document.getElementById("m-jefe").value;
 
-  if(!nombre || !fechaIngreso){
+  if(!nombre || !fechaIngreso || !nomina){
     alert("Completa los campos");
     return;
   }
@@ -213,6 +215,7 @@ window.guardarEmpleado = async (id) => {
 
     if(id){
       await updateDoc(doc(db, "empleados", id), {
+        nomina,
         nombre,
         area,
         fechaIngreso,
@@ -221,6 +224,7 @@ window.guardarEmpleado = async (id) => {
       });
     } else {
       await addDoc(collection(db, "empleados"), {
+        nomina,
         nombre,
         area,
         fechaIngreso,
