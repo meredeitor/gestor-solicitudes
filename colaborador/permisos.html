@@ -16,7 +16,7 @@ import { protectRoute } from "../js/router.js";
 import { db } from "../js/firebase.js";
 import { getSession } from "../js/auth.js";
 
-import { collection, addDoc }
+import { collection, addDoc, getDocs }
 from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 /* =========================
@@ -27,17 +27,26 @@ protectRoute(["colaborador","admin"]);
 /* =========================
    LAYOUT
 ========================= */
-initLayout({ title: "Permisos" });
+initLayout({ title:"Permisos" });
 
 const app = document.getElementById("app");
 const user = getSession();
+
+let empleadoActual = null;
 
 /* =========================
    INIT
 ========================= */
 init();
 
-function init(){
+async function init(){
+
+  const empleados = await getEmpleados();
+
+  empleadoActual = empleados.find(e =>
+    String(e.nomina).trim() === String(user.nomina).trim()
+  );
+
   render();
 }
 
@@ -47,16 +56,20 @@ function init(){
 function render(){
 
   app.innerHTML = `
-    <h2>Solicitar Permiso</h2>
-
     <div class="card">
 
       <h3>${user?.nombre || "Colaborador"}</h3>
 
-      <label>Tipo de permiso</label>
+      <label>Tipo</label>
       <select id="tipoPermiso">
         <option value="retardo">Retardo</option>
         <option value="falta">Falta</option>
+      </select>
+
+      <label>Goce de sueldo</label>
+      <select id="goce">
+        <option value="con_goce">Con goce</option>
+        <option value="sin_goce">Sin goce</option>
       </select>
 
       <label>Fecha</label>
@@ -65,65 +78,106 @@ function render(){
       <label>Motivo</label>
       <textarea id="motivo" placeholder="Describe el motivo"></textarea>
 
-      <label>Justificación</label>
-      <select id="justificacion">
-        <option value="con_goce">Con goce de sueldo</option>
-        <option value="sin_goce">Sin goce de sueldo</option>
-      </select>
-
-      <button class="btn-primary" onclick="guardar()">
+      <button id="btnGuardar" class="btn-primary">
         Enviar solicitud
       </button>
 
+      <div id="loader" style="display:none; margin-top:10px;">
+        ⏳ Enviando solicitud...
+      </div>
+
     </div>
   `;
+
+  document.getElementById("btnGuardar")
+    .addEventListener("click", guardar);
 }
 
 /* =========================
-   GUARDAR
+   GUARDAR (CON LOADER 🔥)
 ========================= */
-window.guardar = async () => {
+async function guardar(){
 
   const tipoPermiso = document.getElementById("tipoPermiso").value;
+  const goce = document.getElementById("goce").value;
   const fecha = document.getElementById("fecha").value;
   const motivo = document.getElementById("motivo").value.trim();
-  const justificacion = document.getElementById("justificacion").value;
 
   if(!fecha || !motivo){
     alert("Completa todos los campos");
     return;
   }
 
+  const btn = document.getElementById("btnGuardar");
+  const loader = document.getElementById("loader");
+
+  // ✅ activar loader
+  loader.style.display = "block";
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
   try {
 
-    await addDoc(collection(db, "solicitudes"), {
+    await addDoc(collection(db,"solicitudes"),{
 
-      tipo: "permiso",
+      tipo:"permiso",
+
+      tipoPermiso, // 🔥 retardo/falta
+      goce,        // 🔥 con/sin goce
+
+      fecha,
+      motivo,
 
       empleadoId: user.id,
       empleadoNombre: user.nombre,
+      nomina: user.nomina,
 
-      tipoPermiso,
-      fecha,
-      motivo,
-      justificacion,
+      estado:"pendiente_jefe",
 
-      estado: "pendiente_jefe",
-      jefeId: user.jefeId || null,
+      // ✅ CLAVE
+      jefeId: empleadoActual?.jefeId ?? null,
 
       fechaCreacion: new Date().toISOString()
-
     });
 
-    alert("Permiso enviado ✅");
+    // ✅ feedback
+    loader.textContent = "✅ Permiso enviado correctamente";
 
-    window.location.href = appUrl("colaborador/dashboard.html");
+    // ✅ limpiar formulario
+    document.getElementById("fecha").value = "";
+    document.getElementById("motivo").value = "";
+    document.getElementById("tipoPermiso").selectedIndex = 0;
+    document.getElementById("goce").selectedIndex = 0;
+
+    // ✅ redirección elegante
+    setTimeout(() => {
+      window.location.href = appUrl("colaborador/dashboard.html");
+    }, 800);
 
   } catch(e){
+
     console.error(e);
+
     alert("Error al guardar");
+
+    loader.style.display = "none";
+    btn.disabled = false;
+    btn.textContent = "Enviar solicitud";
   }
-};
+}
+
+/* =========================
+   DATA
+========================= */
+async function getEmpleados(){
+
+  const snap = await getDocs(collection(db,"empleados"));
+
+  return snap.docs.map(d => ({
+    id:d.id,
+    ...d.data()
+  }));
+}
 
 </script>
 
