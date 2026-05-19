@@ -32,15 +32,16 @@ export function diasPorLey(años){
   return 20 + Math.floor((años - 5) / 5) * 2;
 }
 
-export function diasUsados(solicitudes, empleadoId){
+export function diasUsados(solicitudes, empleadoNomina){
 
   return solicitudes
     .filter(s =>
       s.tipo === "vacaciones" &&
       s.estado === "aprobado" &&
-      s.empleadoId === empleadoId
+      String(s.nomina).trim() === String(empleadoNomina).trim()
     )
     .reduce((total, s) => total + (s.totalDias || 0), 0);
+
 }
 
 export function calcularSaldo(empleado, solicitudes){
@@ -49,7 +50,7 @@ export function calcularSaldo(empleado, solicitudes){
 
   const disponibles = diasPorLey(años);
 
-  const usados = diasUsados(solicitudes, empleado.id);
+  const usados = diasUsados(solicitudes, empleado.nomina);
 
   const restantes = disponibles - usados;
 
