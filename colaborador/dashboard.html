@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Colaborador</title>
-  <link rel="stylesheet" href="../css/app.css">
+   <link rel="stylesheet" href="../css/app.css">
   <link rel="manifest" href="../manifest.json">
 </head>
 <body>
@@ -41,15 +41,34 @@ async function init(){
 
   const snap = await getDocs(collection(db, "solicitudes"));
 
-  const solicitudes = snap.docs.map(d => d.data());
+  const solicitudes = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
 
-  // ✅ SOLO SU INFORMACIÓN
+  /* =========================
+     DEBUG (TEMPORAL)
+  ========================= */
+  console.log("USER:", user);
+  console.log("USER NOMINA:", user?.nomina);
+  console.log("SOLICITUDES NOMINA:", solicitudes.map(s => s.nomina));
+
+  /* =========================
+     FILTRO SEGURO (CLAVE 🔥)
+  ========================= */
   const mias = solicitudes.filter(s =>
-    s.empleadoId === user.id
+    s.nomina && user.nomina &&
+    String(s.nomina).trim() === String(user.nomina).trim()
   );
 
+  console.log("COINCIDEN:", mias);
+
+  /* =========================
+     KPI CORREGIDOS
+  ========================= */
   const pendientes = mias.filter(s =>
-    s.estado === "pendiente_jefe" || s.estado === "pendiente_rh"
+    s.estado === "pendiente_jefe" ||
+    s.estado === "pendiente_rh"
   ).length;
 
   const aprobadas = mias.filter(s =>
@@ -68,14 +87,14 @@ async function init(){
 }
 
 /* =========================
-   RENDER
+   UI
 ========================= */
 function render(data){
 
   app.innerHTML = `
     <section>
 
-      <h2>Bienvenido</h2>
+      <h2>Bienvenido ${user?.nombre || ""}</h2>
 
       <div class="grid-metrics">
 
