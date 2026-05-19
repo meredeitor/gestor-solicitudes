@@ -16,7 +16,7 @@ import { protectRoute } from "../js/router.js";
 import { db } from "../js/firebase.js";
 import { getSession } from "../js/auth.js";
 
-import { collection, addDoc }
+import { collection, addDoc, getDocs } 
 from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 /* =========================
@@ -32,12 +32,21 @@ initLayout({ title: "Vales" });
 const app = document.getElementById("app");
 const user = getSession();
 
+let empleadoActual = null;
+
 /* =========================
    INIT
 ========================= */
 init();
 
-function init(){
+async function init(){
+
+  const empleados = await getEmpleados();
+
+  empleadoActual = empleados.find(e =>
+    String(e.nomina).trim() === String(user.nomina).trim()
+  );
+
   render();
 }
 
@@ -47,14 +56,12 @@ function init(){
 function render(){
 
   app.innerHTML = `
-    <h2>Solicitar Vale</h2>
-
     <div class="card">
 
-      <h3>${user?.nombre || "Colaborador"}</h3>
+      <h3>${user.nombre}</h3>
 
       <label>Tipo</label>
-      <select id="tipoVale" onchange="cambiarOpciones()">
+      <select id="tipoVale">
         <option value="salida">Salida</option>
         <option value="entrada">Entrada</option>
       </select>
@@ -68,12 +75,22 @@ function render(){
       <label>Motivo</label>
       <textarea id="motivo" placeholder="Describe el motivo"></textarea>
 
-      <button class="btn-primary" onclick="guardar()">
+      <button id="btnGuardar" class="btn-primary">
         Enviar solicitud
       </button>
 
+      <div id="loader" style="display:none; margin-top:10px;">
+        ⏳ Enviando solicitud...
+      </div>
+
     </div>
   `;
+
+  document.getElementById("tipoVale")
+    .addEventListener("change", cambiarOpciones);
+
+  document.getElementById("btnGuardar")
+    .addEventListener("click", guardar);
 
   cambiarOpciones();
 }
@@ -81,10 +98,12 @@ function render(){
 /* =========================
    OPCIONES DINÁMICAS
 ========================= */
-window.cambiarOpciones = function(){
+function cambiarOpciones(){
 
   const tipo = document.getElementById("tipoVale").value;
   const select = document.getElementById("tiempo");
+
+  if(!select) return;
 
   if(tipo === "salida"){
     select.innerHTML = `
@@ -97,17 +116,15 @@ window.cambiarOpciones = function(){
 
   if(tipo === "entrada"){
     select.innerHTML = `
-      <option value="entrada_815">
-        Entrada posterior a 8:15 am
-      </option>
+      <option value="entrada_815">Entrada posterior a 8:15 am</option>
     `;
   }
-};
+}
 
 /* =========================
-   GUARDAR
+   GUARDAR (CON LOADER 🔥)
 ========================= */
-window.guardar = async () => {
+async function guardar(){
 
   const tipoVale = document.getElementById("tipoVale").value;
   const tiempo = document.getElementById("tiempo").value;
@@ -119,6 +136,14 @@ window.guardar = async () => {
     return;
   }
 
+  const btn = document.getElementById("btnGuardar");
+  const loader = document.getElementById("loader");
+
+  // ✅ activar loader
+  loader.style.display = "block";
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
   try {
 
     await addDoc(collection(db, "solicitudes"), {
@@ -127,6 +152,7 @@ window.guardar = async () => {
 
       empleadoId: user.id,
       empleadoNombre: user.nombre,
+      nomina: user.nomina,
 
       tipoVale,
       tiempo,
@@ -134,21 +160,53 @@ window.guardar = async () => {
       motivo,
 
       estado: "pendiente_jefe",
-      jefeId: user.jefeId || null,
+
+      // ✅ CLAVE
+      jefeId: empleadoActual?.jefeId ?? null,
 
       fechaCreacion: new Date().toISOString()
 
     });
 
-    alert("Vale enviado ✅");
+    // ✅ feedback visual
+    loader.textContent = "✅ Vale enviado correctamente";
 
-    window.location.href = appUrl("colaborador/dashboard.html");
+    // ✅ limpiar inputs
+    document.getElementById("fecha").value = "";
+    document.getElementById("motivo").value = "";
+    document.getElementById("tipoVale").selectedIndex = 0;
+
+    cambiarOpciones();
+
+    // ✅ redirección elegante
+    setTimeout(() => {
+      window.location.href = appUrl("colaborador/dashboard.html");
+    }, 800);
 
   } catch(e){
+
     console.error(e);
+
     alert("Error al guardar");
+
+    loader.style.display = "none";
+    btn.disabled = false;
+    btn.textContent = "Enviar solicitud";
   }
-};
+}
+
+/* =========================
+   DATA
+========================= */
+async function getEmpleados(){
+
+  const snap = await getDocs(collection(db,"empleados"));
+
+  return snap.docs.map(d => ({
+    id:d.id,
+    ...d.data()
+  }));
+}
 
 </script>
 
