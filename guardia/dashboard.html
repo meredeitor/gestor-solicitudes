@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Guardia</title>
-  <link rel="stylesheet" href="../css/app.css">
+   <link rel="stylesheet" href="../css/app.css">
   <link rel="manifest" href="../manifest.json">
 </head>
 <body>
@@ -17,15 +17,8 @@ import { db } from "../js/firebase.js";
 import { collection, getDocs, updateDoc, doc }
 from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
-/* =========================
-   SEGURIDAD
-========================= */
 protectRoute(["guardia"]);
-
-/* =========================
-   LAYOUT
-========================= */
-initLayout({ title: "Validaciones" });
+initLayout({ title: "Control de accesos" });
 
 const app = document.getElementById("app");
 
@@ -35,24 +28,23 @@ init();
    INIT
 ========================= */
 async function init(){
-  render();
+  await render();
 }
 
 /* =========================
-   UI
+   RENDER
 ========================= */
 async function render(){
 
   const solicitudes = await getSolicitudes();
 
-  // ✅ SOLO APROBADAS
- const lista = solicitudes.filter(s =>
-  s.estado === "aprobado" &&
-  s.tipo === "vale"
-);
+  const lista = solicitudes.filter(s =>
+    s.estado === "aprobado" &&
+    s.tipo === "vale"
+  );
 
   app.innerHTML = `
-    <h2>Validación de salidas</h2>
+    <h2>Control de salidas</h2>
 
     <div class="card">
       <div class="tabla">
@@ -60,7 +52,8 @@ async function render(){
         <div class="fila">
           <div class="col"><strong>Empleado</strong></div>
           <div class="col"><strong>Tipo</strong></div>
-          <div class="col"><strong>Detalle</strong></div>
+          <div class="col"><strong>Estado</strong></div>
+          <div class="col"><strong>Control</strong></div>
           <div class="col"><strong>Acción</strong></div>
         </div>
 
@@ -68,102 +61,183 @@ async function render(){
 
       </div>
     </div>
+
+    <div id="modal" class="modal hidden"></div>
   `;
+
+  setTimeout(() => {
+
+    document.querySelectorAll(".btn-salida")
+      .forEach(btn => {
+        btn.onclick = () => marcarSalida(btn.dataset.id);
+      });
+
+    document.querySelectorAll(".btn-entrada")
+      .forEach(btn => {
+        btn.onclick = () => marcarEntrada(btn.dataset.id);
+      });
+
+    document.querySelectorAll(".btn-detalle")
+      .forEach(btn => {
+        btn.onclick = () => verDetalle(btn.dataset.id);
+      });
+
+  }, 0);
 }
 
 /* =========================
-   FILA
+   FILA (ULTRA PRO)
 ========================= */
 function fila(s){
+
+  let estado = "Pendiente";
+
+  if(s.horaSalida && !s.horaEntrada) estado = "Fuera";
+  if(s.horaEntrada) estado = "Regresó";
+
+  const salida = s.horaSalida ? formatHora(s.horaSalida) : "--";
+  const entrada = s.horaEntrada ? formatHora(s.horaEntrada) : "--";
+
+  let tiempo = "-";
+
+  if(s.horaSalida && !s.horaEntrada){
+    tiempo = "⏳ En curso";
+  }
+
+  if(s.tiempoFueraMin){
+    tiempo = `${s.tiempoFueraMin} min`;
+    if(s.tiempoFueraMin > 60){
+      tiempo = `⚠️ ${s.tiempoFueraMin} min`;
+    }
+  }
 
   return `
     <div class="fila">
 
-      <div class="col">
-        ${s.empleadoNombre}
-      </div>
+      <div class="col">${s.empleadoNombre}</div>
 
       <div class="col">
-        ${labelTipo(s)}
+        ${s.tipoVale === "salida" ? "Salida" : "Entrada"}
       </div>
 
+      <div class="col">${estado}</div>
+
+      <!-- ✅ COLUMNA COMPACTA -->
       <div class="col">
-        ${detalle(s)}
+        ${salida} → ${entrada}<br>
+        <small>${tiempo}</small>
       </div>
 
       <div class="col acciones">
-        <button onclick="validar('${s.id}')">✅ Validar</button>
-      </div>
 
+        <!-- 🔥 SALIDA NORMAL -->
+        ${s.tipoVale === "salida" && !s.horaSalida ? `
+          <button class="btn-salida" data-id="${s.id}">
+            🚪
+          </button>
+        ` : ""}
+
+        ${s.tipoVale === "salida" && s.horaSalida && !s.horaEntrada ? `
+          <button class="btn-entrada" data-id="${s.id}">
+            🔙
+          </button>
+        ` : ""}
+
+        <!-- 🔥 ENTRADA TARDE -->
+        ${s.tipoVale === "entrada" && !s.horaEntrada ? `
+          <button class="btn-entrada" data-id="${s.id}">
+            ✅
+          </button>
+        ` : ""}
+
+        ${s.horaEntrada ? "✅" : ""}
+
+        <button class="btn-detalle" data-id="${s.id}">
+          👁️
+        </button>
+
+      </div>
     </div>
   `;
 }
 
 /* =========================
-   DETALLE
+   SALIDA
 ========================= */
-function detalle(s){
+async function marcarSalida(id){
 
-  if(s.tipo === "vacaciones"){
-    return "Vacaciones";
-  }
-
-  if(s.tipo === "permiso"){
-    return `${formatFecha(s.fecha)}`;
-  }
-
-  if(s.tipo === "vale"){
-    return `${formatFecha(s.fecha)}`;
-  }
-
-  return "-";
-}
-
-/* =========================
-   TIPO
-========================= */
-function labelTipo(s){
-
-  if(s.tipo === "vacaciones") return "Vacaciones";
-
-  if(s.tipo === "permiso"){
-    return s.tipoPermiso === "retardo"
-      ? "Retardo"
-      : "Falta";
-  }
-
-  if(s.tipo === "vale"){
-    return s.tipoVale === "salida"
-      ? "Salida"
-      : "Entrada";
-  }
-
-  return s.tipo;
-}
-
-/* =========================
-   VALIDAR
-========================= */
-window.validar = async (id) => {
-
-  await updateDoc(doc(db, "solicitudes", id), {
-    validado: true,
-    fechaValidacion: new Date().toISOString()
+  await updateDoc(doc(db,"solicitudes",id),{
+    horaSalida: new Date().toISOString()
   });
 
   render();
-};
+}
+
+/* =========================
+   ENTRADA
+========================= */
+async function marcarEntrada(id){
+
+  const ahora = new Date();
+
+  const solicitudes = await getSolicitudes();
+  const s = solicitudes.find(x => x.id === id);
+
+  let diff = null;
+
+  if(s.horaSalida){
+    const salida = new Date(s.horaSalida);
+    diff = Math.floor((ahora - salida) / 60000);
+  }
+
+  await updateDoc(doc(db,"solicitudes",id),{
+    horaEntrada: ahora.toISOString(),
+    tiempoFueraMin: diff,
+    validado: true
+  });
+
+  render();
+}
+
+/* =========================
+   MODAL
+========================= */
+async function verDetalle(id){
+
+  const solicitudes = await getSolicitudes();
+  const s = solicitudes.find(x => x.id === id);
+
+  const modal = document.getElementById("modal");
+  modal.classList.remove("hidden");
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Detalle</h3>
+        <button id="cerrarModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p><strong>Empleado:</strong> ${s.empleadoNombre}</p>
+        <p><strong>Tipo:</strong> ${s.tipoVale}</p>
+        <p><strong>Motivo:</strong> ${s.motivo}</p>
+        <p><strong>Tiempo:</strong> ${s.tiempoFueraMin || "-"} min</p>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("cerrarModal")
+    .onclick = () => modal.classList.add("hidden");
+}
 
 /* =========================
    UTIL
 ========================= */
-function formatFecha(fecha){
-
+function formatHora(fecha){
   const d = new Date(fecha);
-
-  return d.toLocaleDateString("es-MX", {
-    day: "2-digit",
-    month: "short"
+  return d.toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit"
   });
 }
 
@@ -171,12 +245,10 @@ function formatFecha(fecha){
    DATA
 ========================= */
 async function getSolicitudes(){
-
-  const snap = await getDocs(collection(db, "solicitudes"));
-
-  return snap.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
+  const snap = await getDocs(collection(db,"solicitudes"));
+  return snap.docs.map(d => ({
+    id:d.id,
+    ...d.data()
   }));
 }
 
