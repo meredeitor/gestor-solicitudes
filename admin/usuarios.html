@@ -74,6 +74,7 @@ async function render(){
 ========================= */
 async function guardarUsuario(){
 
+  const nomina = document.getElementById("nomina").value.trim();
   const nombre = document.getElementById("nombre").value.trim();
   const email = document.getElementById("email").value.trim();
   const rol = document.getElementById("rol").value;
@@ -90,6 +91,7 @@ async function guardarUsuario(){
 
       // ✅ UPDATE
       await updateDoc(doc(db, "usuarios", usuarioEditando), {
+        nomina,
         nombre,
         email,
         rol,
@@ -102,6 +104,7 @@ async function guardarUsuario(){
 
       // ✅ CREATE
       await addDoc(collection(db, "usuarios"), {
+        nomina,
         nombre,
         email,
         rol,
@@ -123,6 +126,7 @@ async function guardarUsuario(){
    LIMPIAR
 ========================= */
 function limpiarFormulario(){
+  document.getElementById("nomina").value = ""; 
   document.getElementById("nombre").value = "";
   document.getElementById("email").value = "";
   document.getElementById("rol").value = "jefe";
@@ -185,6 +189,7 @@ window.editar = async (id) => {
 
   usuarioEditando = id;
 
+  document.getElementById("nomina").value = user.nomina;
   document.getElementById("nombre").value = user.nombre;
   document.getElementById("email").value = user.email;
   document.getElementById("rol").value = user.rol;
@@ -218,6 +223,7 @@ window.abrirModal = function(user = null){
 
       <h3>${user ? "Editar" : "Nuevo"} usuario</h3>
 
+      <input id="m-nomina" placeholder="Nómina" value="${user?.nomina || ""}">
       <input id="m-nombre" placeholder="Nombre" value="${user?.nombre || ""}">
       <input id="m-email" placeholder="Correo" value="${user?.email || ""}">
 
@@ -254,12 +260,13 @@ window.cerrarModal = () => {
 };
 window.guardarModal = async (id) => {
 
+  const nomina = document.getElementById("m-nomina").value.trim();
   const nombre = document.getElementById("m-nombre").value.trim();
   const email = document.getElementById("m-email").value.trim();
   const rol = document.getElementById("m-rol").value;
   const active = document.getElementById("m-active").checked;
 
-  if(!nombre || !email){
+  if(!nombre || !email || !nomina){
     alert("Completa los campos");
     return;
   }
@@ -268,11 +275,11 @@ window.guardarModal = async (id) => {
 
     if(id){
       await updateDoc(doc(db, "usuarios", id), {
-        nombre, email, rol, active
+        nomina, nombre, email, rol, active
       });
     } else {
       await addDoc(collection(db, "usuarios"), {
-        nombre, email, rol, active
+        nomina, nombre, email, rol, active
       });
     }
 
